@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メインコピー生成</title>
+    <!-- Tailwind CSSを読み込みます -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを読み込みます */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            scroll-behavior: smooth;
+        }
+        /* ローディングスピナーのアニメーション */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen py-8">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-3xl">
+        <div class="bg-white rounded-2xl shadow-lg p-6 md:p-10">
+            
+            <header class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">メインコピー生成</h1>
+                <p class="text-gray-500">ウェブページのURLを入力すると、AIが内容を分析して魅力的なメインコピーを提案します。</p>
+            </header>
+
+            <main>
+                <!-- URL入力フォーム -->
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label for="urlInput" class="block text-sm font-medium text-gray-700 mb-1">ウェブサイトURL</label>
+                        <input type="url" id="urlInput" placeholder="https://example.com" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors">
+                    </div>
+                     <!-- 追加の要望入力フォーム -->
+                    <div>
+                        <label for="additionalRequestInput" class="block text-sm font-medium text-gray-700 mb-1">
+                            追加の要望 (任意)
+                            <span class="text-xs text-gray-500 ml-1">例: 若者向け、面白い感じで、SEOを意識して</span>
+                        </label>
+                        <textarea id="additionalRequestInput" rows="2" placeholder="コピーのテイストやターゲットなどを入力" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"></textarea>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button id="generateButton" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5">
+                        提案を生成
+                    </button>
+                </div>
+
+                <!-- 結果表示エリア -->
+                <div id="resultContainer" class="mt-8">
+                    <!-- ローディング表示 -->
+                    <div id="loader" class="hidden flex flex-col items-center justify-center text-center p-8">
+                        <div class="loader mb-4"></div>
+                        <p class="text-gray-600 font-semibold">AIがページを読み込んで分析中です...</p>
+                        <p class="text-sm text-gray-500">少し時間がかかる場合があります。</p>
+                    </div>
+                    <!-- エラーメッセージ表示 -->
+                    <div id="errorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
+                        <strong class="font-bold">エラーが発生しました。</strong>
+                        <span class="block sm:inline" id="errorText"></span>
+                    </div>
+
+                    <!-- 手動入力のフォールバックエリア -->
+                    <div id="manualInputContainer" class="hidden mt-6 p-6 bg-gray-50 rounded-lg border border-dashed">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">URLの読み込みに失敗しました</h3>
+                        <p class="text-gray-600 mb-4">お手数ですが、ウェブサイトのテキストを以下に直接貼り付けて生成してください。</p>
+                        <textarea id="manualTextInput" rows="10" class="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="ここにウェブサイトの本文を貼り付け..."></textarea>
+                        <button id="generateFromTextButton" class="mt-4 w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition-all">
+                            このテキストから提案を生成
+                        </button>
+                    </div>
+
+                    <!-- 生成されたコピー表示 -->
+                    <div id="copyResult" class="hidden mt-6">
+                         <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b-2 pb-2">提案されたメインコピー</h2>
+                         <div id="copyList" class="grid grid-cols-1 gap-4">
+                            <!-- ここに結果カードが挿入されます -->
+                         </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+        <footer class="text-center mt-6 text-gray-500 text-sm">
+            <p>&copy; 2024 コーディング パートナー</p>
+        </footer>
+    </div>
+
+    <script>
+        // DOM要素を取得
+        const urlInput = document.getElementById('urlInput');
+        const additionalRequestInput = document.getElementById('additionalRequestInput');
+        const generateButton = document.getElementById('generateButton');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        const copyResult = document.getElementById('copyResult');
+        const copyList = document.getElementById('copyList');
+        const manualInputContainer = document.getElementById('manualInputContainer');
+        const manualTextInput = document.getElementById('manualTextInput');
+        const generateFromTextButton = document.getElementById('generateFromTextButton');
+        
+        // イベントリスナーを設定
+        generateButton.addEventListener('click', handleGeneration);
+        generateFromTextButton.addEventListener('click', handleGenerationFromText);
+
+        async function handleGeneration() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                showError('URLを入力してください。');
+                return;
+            }
+            resetUI();
+            setLoadingState(true);
+
+            try {
+                // CORSプロキシ経由でウェブページのHTMLを取得
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                const response = await fetch(proxyUrl);
+                if (!response.ok) {
+                    throw new Error(`ページの取得に失敗しました (ステータス: ${response.status})`);
+                }
+                const htmlContent = await response.text();
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlContent, 'text/html');
+                const bodyText = doc.body.innerText || "";
+                
+                if (bodyText.trim().length < 50) {
+                     throw new Error('ページから十分なテキストを抽出できませんでした。別のURLを試してください。');
+                }
+
+                await generateCopy(bodyText);
+
+            } catch (error) {
+                console.error('URLからの生成エラー:', error);
+                const userMessage = 'ページの自動取得に失敗しました。サイトが外部アクセスをブロックしているか、URLが正しくない可能性があります。';
+                showError(userMessage);
+                manualInputContainer.classList.remove('hidden'); // フォールバックを表示
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        async function handleGenerationFromText() {
+            const textContent = manualTextInput.value.trim();
+            if (!textContent) {
+                showError('テキストエリアに内容を貼り付けてください。');
+                return;
+            }
+            resetUI();
+            setLoadingState(true);
+            
+            await generateCopy(textContent);
+
+            setLoadingState(false);
+        }
+
+        async function generateCopy(textContent) {
+             try {
+                const truncatedText = textContent.substring(0, 4000);
+                const additionalRequest = additionalRequestInput.value.trim();
+                const generatedCopyText = await callGeminiAPI(truncatedText, additionalRequest);
+                displayResults(generatedCopyText);
+             } catch(apiError) {
+                console.error('API呼び出しエラー:', apiError);
+                showError(apiError.message || 'AIからの応答がありませんでした。');
+             }
+        }
+
+        async function callGeminiAPI(textContent, additionalRequest) {
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            let prompt = `以下のウェブサイトのコンテンツを分析し、ユーザーの興味を引く魅力的なメインコピーを日本語で10個提案してください。
+以下のルールを厳守してください:
+- 箇条書きで、提案するコピーのみをリストアップすること。
+- 説明文や前置き、結びの言葉は一切含めないこと。
+- 「」や他の記号は一切使用しないこと。`;
+
+            if (additionalRequest) {
+                prompt = `以下のウェブサイトのコンテンツと【追加の要望】を基に、ユーザーの興味を引く魅力的なメインコピーを日本語で10個提案してください。
+以下のルールを厳守してください:
+- 箇条書きで、提案するコピーのみをリストアップすること。
+- 説明文や前置き、結びの言葉は一切含めないこと。
+- 「」や他の記号は一切使用しないこと。
+\n\n【追加の要望】\n${additionalRequest}`;
+            }
+            prompt += `\n\n---\n[ウェブサイトのコンテンツ]\n${textContent}\n---\n\n提案:`;
+            
+            const payload = { contents: [{ parts: [{ text: prompt }] }] };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error('AIとの通信に失敗しました。');
+
+            const result = await response.json();
+            
+            if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                throw new Error('AIが有効な提案を生成できませんでした。');
+            }
+        }
+        
+        function setLoadingState(isLoading) {
+            if (isLoading) {
+                loader.classList.remove('hidden');
+                generateButton.disabled = true;
+                generateButton.textContent = '生成中...';
+                generateFromTextButton.disabled = true;
+            } else {
+                loader.classList.add('hidden');
+                generateButton.disabled = false;
+                generateButton.textContent = '提案を生成';
+                generateFromTextButton.disabled = false;
+            }
+        }
+
+        function resetUI() {
+            errorMessage.classList.add('hidden');
+            copyResult.classList.add('hidden');
+            manualInputContainer.classList.add('hidden'); 
+            copyList.innerHTML = '';
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function displayResults(text) {
+            copyList.innerHTML = ''; // 古い結果をクリア
+            const lines = text.split('\n').filter(line => line.trim().length > 0);
+            
+            lines.forEach(line => {
+                // 箇条書きのマーカー、引用符、その他の不要な装飾を削除
+                const cleanText = line.replace(/^[\s*-\d.]+\s*/, '').replace(/「|」/g, '').trim();
+
+                // クリーンなテキストが空でなければカードを作成
+                if (cleanText) {
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-50 p-4 rounded-lg border border-gray-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-shadow hover:shadow-md';
+                    
+                    const textToCopy = cleanText;
+                    const displayText = cleanText;
+
+                    card.innerHTML = `
+                        <p class="text-gray-800 flex-grow text-lg">${displayText}</p>
+                        <button class="copy-button flex-shrink-0 w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all duration-200 ease-in-out">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>
+                            <span>コピー</span>
+                        </button>
+                    `;
+                    card.querySelector('.copy-button').addEventListener('click', (e) => copyToClipboard(textToCopy, e.currentTarget));
+                    copyList.appendChild(card);
+                }
+            });
+            copyResult.classList.remove('hidden');
+        }
+        
+        function copyToClipboard(text, buttonElement) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed"; textArea.style.top = 0; textArea.style.left = 0;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                const originalContent = buttonElement.innerHTML;
+                buttonElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-lg" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z"/></svg> <span>コピーしました！</span>`;
+                buttonElement.classList.replace('bg-gray-200', 'bg-green-500');
+                buttonElement.classList.add('text-white');
+                setTimeout(() => {
+                    buttonElement.innerHTML = originalContent;
+                    buttonElement.classList.replace('bg-green-500', 'bg-gray-200');
+                    buttonElement.classList.remove('text-white');
+                }, 2000);
+            } catch (err) {
+                console.error('クリップボードへのコピーに失敗しました', err);
+            }
+            document.body.removeChild(textArea);
+        }
+    </script>
+</body>
+</html>
